@@ -65,7 +65,6 @@ A Laravel-based web application that allows users to translate English text into
    ```
    php artisan serve
    ```
-   cmd /c "cd /d C:\Users\Danarajan\OneDrive\Pictures\Documents\Desktop\DevTest\speech-translator && C:\xampp\php\php.exe artisan serve"
 
 7. Access the application at `http://localhost:8000`
 
