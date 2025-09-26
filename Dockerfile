@@ -31,11 +31,18 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /var/www
 
+# Copy composer files first for better layer caching
+COPY composer.json composer.lock ./
+
+# Install dependencies with increased memory limit
+ENV COMPOSER_ALLOW_SUPERUSER=1
+RUN php -d memory_limit=-1 /usr/bin/composer install --no-dev --no-autoloader --no-scripts
+
 # Copy existing application directory
 COPY . /var/www/
 
-# Install dependencies
-RUN composer install --optimize-autoloader --no-dev
+# Generate optimized autoload files
+RUN php -d memory_limit=-1 /usr/bin/composer dump-autoload --optimize --no-dev
 
 # Set up Nginx config
 COPY docker/nginx/nginx.conf /etc/nginx/sites-enabled/default
