@@ -483,7 +483,7 @@
                 }
                 
                 $.ajax({
-                    url: $(this).attr('action'),
+                    url: '/translate',
                     type: 'POST',
                     data: formData,
                     dataType: 'json',
