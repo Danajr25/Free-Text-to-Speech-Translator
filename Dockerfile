@@ -20,8 +20,8 @@ RUN apt-get update && apt-get install -y \
 # Clear cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions
-RUN docker-php-ext-install pdo_mysql mbstring zip exif pcntl
+# Install PHP extensions (including PostgreSQL)
+RUN docker-php-ext-install pdo_mysql pdo_pgsql mbstring zip exif pcntl
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg
 RUN docker-php-ext-install gd
 
@@ -53,9 +53,16 @@ RUN if [ ! -f .env ]; then cp .env.example .env; fi && php artisan key:generate 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 
-# Create start script
+# Create start script that includes migrations
 RUN echo '#!/bin/bash' > /start.sh && \
+    echo 'echo "Starting Laravel application..."' >> /start.sh && \
+    echo 'echo "Running database migrations..."' >> /start.sh && \
+    echo 'php artisan migrate --force --no-interaction || echo "Migration failed - continuing startup"' >> /start.sh && \
+    echo 'echo "Caching configuration..."' >> /start.sh && \
+    echo 'php artisan config:cache || echo "Config cache failed"' >> /start.sh && \
+    echo 'echo "Starting PHP-FPM..."' >> /start.sh && \
     echo 'php-fpm -D' >> /start.sh && \
+    echo 'echo "Starting Nginx..."' >> /start.sh && \
     echo 'nginx -g "daemon off;"' >> /start.sh && \
     chmod +x /start.sh
 
