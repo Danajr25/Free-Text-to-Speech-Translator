@@ -53,8 +53,17 @@ RUN cp .env.example .env && php artisan key:generate --force
 # Set permissions
 RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 
-# Expose port
+# Create start script
+RUN echo '#!/bin/bash' > /start.sh && \
+    echo 'php-fpm -D' >> /start.sh && \
+    echo 'nginx -g "daemon off;"' >> /start.sh && \
+    chmod +x /start.sh
+
+# Expose port (Railway uses the PORT environment variable)
 EXPOSE 80
+
+# Start services
+CMD ["/start.sh"]
 
 # Start PHP-FPM and Nginx
 CMD php-fpm -D && nginx -g "daemon off;"
