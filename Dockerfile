@@ -47,8 +47,8 @@ RUN php -d memory_limit=-1 /usr/bin/composer dump-autoload --optimize --no-dev
 # Set up Nginx config
 COPY docker/nginx/nginx.conf /etc/nginx/sites-enabled/default
 
-# Generate key if not set
-RUN php artisan key:generate --force
+# Create .env from .env.example and generate key
+RUN cp .env.example .env && php artisan key:generate --force
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
