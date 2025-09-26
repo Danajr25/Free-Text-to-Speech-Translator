@@ -1,6 +1,6 @@
 FROM php:8.2-fpm
 
-# Install dependencies
+# Install dependencies (including PostgreSQL development libraries)
 RUN apt-get update && apt-get install -y \
     build-essential \
     libpng-dev \
@@ -15,7 +15,8 @@ RUN apt-get update && apt-get install -y \
     curl \
     libzip-dev \
     libonig-dev \
-    nginx
+    nginx \
+    libpq-dev
 
 # Clear cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
