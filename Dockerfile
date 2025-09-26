@@ -47,14 +47,20 @@ RUN php -d memory_limit=-1 /usr/bin/composer dump-autoload --optimize --no-dev
 # Set up Nginx config
 COPY docker/nginx/nginx.conf /etc/nginx/sites-enabled/default
 
-# Generate key if not set
-RUN php artisan key:generate --force
+# Create .env from .env.example and generate key if needed
+RUN if [ ! -f .env ]; then cp .env.example .env; fi && php artisan key:generate --force
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 
-# Expose port
+# Create start script
+RUN echo '#!/bin/bash' > /start.sh && \
+    echo 'php-fpm -D' >> /start.sh && \
+    echo 'nginx -g "daemon off;"' >> /start.sh && \
+    chmod +x /start.sh
+
+# Expose port (Railway uses the PORT environment variable)
 EXPOSE 80
 
-# Start PHP-FPM and Nginx
-CMD php-fpm -D && nginx -g "daemon off;"
+# Start services
+CMD ["/start.sh"]
