@@ -15,7 +15,7 @@ services:
       - key: APP_KEY
         sync: false
       - key: DB_CONNECTION
-        value: mysql
+        value: pgsql
       - key: DB_HOST
         fromDatabase:
           name: speech-translator-db
@@ -40,13 +40,13 @@ services:
   # Database service
   - type: pserv
     name: speech-translator-db
-    engine: mysql
-    version: "8.0"
+    engine: postgres
+    version: "15"
     ipAllowList:
       - source: 0.0.0.0/0
         description: everywhere
     plan: free
     disk:
       name: speech-translator-data
-      mountPath: /var/lib/mysql
-      sizeGB: 10
+      mountPath: /var/lib/postgresql
+      sizeGB: 1
