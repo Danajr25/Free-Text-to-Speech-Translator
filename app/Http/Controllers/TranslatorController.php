@@ -5,21 +5,25 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\TranslationHistory;
 use App\Services\TranslationService;
+use App\Services\TextToSpeechService;
 use Illuminate\Http\Request;
 
 class TranslatorController extends Controller
 {
     protected $translationService;
+    protected $textToSpeechService;
     
     /**
      * Create a new controller instance.
      *
      * @param TranslationService $translationService
+     * @param TextToSpeechService $textToSpeechService
      * @return void
      */
-    public function __construct(TranslationService $translationService)
+    public function __construct(TranslationService $translationService, TextToSpeechService $textToSpeechService)
     {
         $this->translationService = $translationService;
+        $this->textToSpeechService = $textToSpeechService;
     }
     
     /**
@@ -139,5 +143,76 @@ class TranslatorController extends Controller
     {
         $history = TranslationHistory::orderBy('created_at', 'desc')->paginate(10);
         return view('history', compact('history'));
+    }
+    
+    /**
+     * Generate audio for text using TextToSpeechService
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function generateAudio(Request $request)
+    {
+        \Log::info('generateAudio called', [
+            'text' => $request->text,
+            'language' => $request->language,
+            'voice_gender' => $request->voice_gender
+        ]);
+
+        $request->validate([
+            'text' => 'required|string',
+            'language' => 'required|string',
+            'voice_gender' => 'nullable|string|in:male,female',
+            'voice_speed' => 'nullable|numeric|between:0.5,2.0',
+        ]);
+        
+        try {
+            $result = $this->textToSpeechService->generateAudio(
+                $request->text,
+                $request->language,
+                $request->voice_gender ?? 'female'
+            );
+            
+            if ($result['success']) {
+                return response()->json([
+                    'success' => true,
+                    'audio_url' => $result['audio_url'],
+                    'filename' => $result['filename']
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['message']
+                ], 500);
+            }
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to generate audio: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * Download audio file
+     *
+     * @param  string  $filename
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     */
+    public function downloadAudio($filename)
+    {
+        try {
+            $filePath = storage_path('app/public/audio/' . $filename);
+            
+            if (!file_exists($filePath)) {
+                abort(404, 'Audio file not found');
+            }
+            
+            return response()->download($filePath, $filename, [
+                'Content-Type' => 'audio/mpeg',
+            ]);
+        } catch (\Exception $e) {
+            abort(500, 'Failed to download audio file');
+        }
     }
 }

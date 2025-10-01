@@ -17,3 +17,5 @@ use App\Http\Controllers\TranslatorController;
 Route::get('/', [TranslatorController::class, 'index'])->name('translator.index');
 Route::post('/translate', [TranslatorController::class, 'translate'])->name('translator.translate');
 Route::get('/history', [TranslatorController::class, 'history'])->name('translator.history');
+Route::post('/generate-audio', [TranslatorController::class, 'generateAudio'])->name('translator.generate-audio');
+Route::get('/download-audio/{filename}', [TranslatorController::class, 'downloadAudio'])->name('translator.download-audio');

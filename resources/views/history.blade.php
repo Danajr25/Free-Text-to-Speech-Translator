@@ -72,9 +72,9 @@
 
         .nav-link.active {
             color: var(--primary-color) !important;
-            background: rgba(102, 126, 234, 0.1);
+            background: rgba(255, 255, 255, 0.1);
         }
-
+    
         .translator-card {
             background: var(--white);
             border-radius: var(--border-radius);
@@ -211,8 +211,7 @@
                                         <th class="text-muted fw-semibold">Date</th>
                                         <th class="text-muted fw-semibold">Original Text</th>
                                         <th class="text-muted fw-semibold">Translation</th>
-                                        <th class="text-muted fw-semibold">Languages</th>
-                                        <th class="text-muted fw-semibold text-center">Actions</th>
+                                        <th class="text-muted fw-semibold" style="width: 200px;">Languages</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -228,19 +227,10 @@
                                             <td class="py-3">
                                                 <span class="text-dark">{{ Str::limit($item->translated_text, 40) }}</span>
                                             </td>
-                                            <td class="py-3">
+                                            <td class="py-3" style="white-space: nowrap;">
                                                 <span class="badge bg-primary">{{ strtoupper($item->source_language) }}</span>
                                                 <i class="fas fa-arrow-right mx-2 text-muted"></i>
                                                 <span class="badge bg-secondary">{{ strtoupper($item->target_language) }}</span>
-                                            </td>
-                                            <td class="py-3 text-center">
-                                                @if($item->audio_path)
-                                                    <button class="btn btn-sm btn-primary play-audio me-2" data-audio="{{ $item->audio_path }}">
-                                                        <i class="fas fa-play"></i>
-                                                    </button>
-                                                @else
-                                                    <span class="text-muted small">No audio</span>
-                                                @endif
                                             </td>
                                         </tr>
                                     @endforeach

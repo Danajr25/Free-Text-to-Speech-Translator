@@ -627,24 +627,12 @@
                 }
             });
 
-            // Download button click handler - Download captured audio
+            // Download button click handler - Generate and download audio
             $('#downloadBtn').click(function() {
-                if (audioBlob && audioUrl) {
-                    // Download the captured audio
-                    const link = document.createElement('a');
-                    link.href = audioUrl;
-                    link.download = `translation-${Date.now()}.wav`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    console.log('Audio download initiated');
+                if (currentTranslation && currentLanguage && currentVoiceSettings) {
+                    generateAndDownloadAudio();
                 } else {
-                    // If no audio captured, generate and record it
-                    if (currentTranslation && currentLanguage && currentVoiceSettings) {
-                        generateAndRecordAudio();
-                    } else {
-                        alert('No audio available to download. Please generate translation first.');
-                    }
+                    alert('No translation available to download. Please generate translation first.');
                 }
             });
 
@@ -948,68 +936,48 @@
                 }
             }
             
-            function generateAndRecordAudio() {
+            function generateAndDownloadAudio() {
                 if (currentTranslation && currentLanguage && currentVoiceSettings) {
                     console.log('Generating audio for download...');
                     
                     // Show loading state
                     $('#downloadBtn').html('<i class="fas fa-spinner fa-spin me-2"></i>Generating...');
                     
-                    // Find and set the voice
-                    const voices = speechSynthesis.getVoices();
-                    const targetVoices = voices.filter(voice => 
-                        voice.lang.startsWith(currentLanguage) || voice.lang.startsWith(getLanguageCode(currentLanguage))
-                    );
-                    
-                    let selectedVoice = null;
-                    if (targetVoices.length > 0) {
-                        selectedVoice = targetVoices[0];
-                        
-                        if (currentVoiceSettings.gender && targetVoices.length > 1) {
-                            const genderMatch = targetVoices.find(voice => {
-                                const voiceName = voice.name.toLowerCase();
-                                if (currentVoiceSettings.gender === 'male') {
-                                    return voiceName.includes('male') || voiceName.includes('man') || 
-                                           voiceName.includes('david') || voiceName.includes('mark') || 
-                                           voiceName.includes('alex') || voiceName.includes('tom');
-                                } else {
-                                    return voiceName.includes('female') || voiceName.includes('woman') || 
-                                           voiceName.includes('sara') || voiceName.includes('anna') || 
-                                           voiceName.includes('zira') || voiceName.includes('hazel');
-                                }
-                            });
-                            if (genderMatch) selectedVoice = genderMatch;
-                        }
-                    }
-                    
-                    // Create audio from speech
-                    createAudioFromSpeech(currentTranslation, selectedVoice, currentVoiceSettings.speed || 1.0)
-                        .then(blob => {
-                            // Clean up previous audio
-                            if (audioUrl) {
-                                URL.revokeObjectURL(audioUrl);
+                    // Make API call to generate audio
+                    $.ajax({
+                        url: '/generate-audio',
+                        method: 'POST',
+                        data: {
+                            text: currentTranslation,
+                            language: currentLanguage,
+                            voice_gender: currentVoiceSettings.gender || 'female',
+                            _token: $('meta[name="csrf-token"]').attr('content')
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                // Reset button text
+                                $('#downloadBtn').html('<i class="fas fa-download me-2"></i>Download');
+                                
+                                // Trigger direct download
+                                const link = document.createElement('a');
+                                link.href = '/download-audio/' + response.filename;
+                                link.download = response.filename;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                
+                                console.log('Audio generated and download initiated');
+                            } else {
+                                $('#downloadBtn').html('<i class="fas fa-download me-2"></i>Download');
+                                alert('Error generating audio: ' + response.message);
                             }
-                            
-                            audioBlob = blob;
-                            audioUrl = URL.createObjectURL(blob);
-                            
-                            $('#downloadBtn').html('<i class="fas fa-download me-2"></i>Download');
-                            
-                            // Auto-download
-                            const link = document.createElement('a');
-                            link.href = audioUrl;
-                            link.download = `translation-${Date.now()}.wav`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            
-                            console.log('Audio generated and downloaded successfully');
-                        })
-                        .catch(error => {
-                            console.error('Error generating audio:', error);
+                        },
+                        error: function(xhr, status, error) {
+                            console.error('Audio generation failed:', error);
                             $('#downloadBtn').html('<i class="fas fa-download me-2"></i>Download');
                             alert('Error generating audio. Please try again.');
-                        });
+                        }
+                    });
                 }
             }
 
