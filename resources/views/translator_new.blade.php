@@ -66,6 +66,34 @@
             color: var(--primary-hover);
         }
 
+        .dropdown-toggle::after {
+            display: none;
+        }
+
+        .dropdown-menu {
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            box-shadow: var(--shadow-lg);
+            padding: 0.5rem 0;
+            min-width: 160px;
+        }
+
+        .dropdown-item {
+            padding: 0.75rem 1rem;
+            color: var(--text-color);
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .dropdown-item:hover {
+            background-color: var(--secondary-color);
+            color: var(--primary-color);
+        }
+
+        .dropdown-item i {
+            color: var(--primary-color);
+        }
+
         .hero-section {
             padding: 4rem 0;
             text-align: center;
@@ -370,10 +398,25 @@
                         <i class="fas fa-language"></i>
                         SpeechTranslator
                     </a>
-                    <ul class="nav-links">
+                    <!-- Desktop Navigation -->
+                    <ul class="nav-links d-none d-md-flex">
                         <li><a href="{{ route('translator.index') }}">Translator</a></li>
                         <li><a href="{{ route('translator.history') }}">History</a></li>
                     </ul>
+                    <!-- Mobile Navigation Dropdown -->
+                    <div class="dropdown d-md-none">
+                        <button class="btn btn-link dropdown-toggle p-0" type="button" id="mobileMenuDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="color: var(--primary-color); font-size: 1.5rem; border: none; background: none;">
+                            <i class="fas fa-bars"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="mobileMenuDropdown">
+                            <li><a class="dropdown-item" href="{{ route('translator.index') }}">
+                                <i class="fas fa-language me-2"></i>Translator
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ route('translator.history') }}">
+                                <i class="fas fa-history me-2"></i>History
+                            </a></li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
@@ -405,7 +448,7 @@
         <div class="translator-section" id="translator">
             <div class="container">
                 <div class="translator-card">
-                    <form id="translationForm" action="{{ route('translator.translate') }}" method="POST">
+                    <form id="translationForm" action="javascript:void(0);" method="POST">
                         @csrf
                         
                         <!-- Text Input -->
@@ -582,7 +625,25 @@
             // Handle form submission
             $('#translationForm').submit(function(e) {
                 e.preventDefault();
+                
+                console.log('Form submitted via AJAX');
+                
+                // Validate required fields
+                const text = $('#text').val().trim();
+                const targetLang = $('#target_language').val();
+                
+                if (!text) {
+                    alert('Please enter some text to translate.');
+                    return false;
+                }
+                
+                if (!targetLang) {
+                    alert('Please select a target language.');
+                    return false;
+                }
+                
                 const formData = $(this).serialize();
+                console.log('Form data:', formData);
                 
                 // Show loader
                 $('#loader').show();
@@ -601,8 +662,11 @@
                     type: 'POST',
                     data: formData,
                     dataType: 'json',
+                    timeout: 30000, // 30 second timeout
                     success: function(response) {
-                        if(response.success) {
+                        console.log('AJAX success:', response);
+                        
+                        if(response && response.success) {
                             $('#translatedText').text(response.translation);
                             
                             // Parse the target language format (e.g., "en-male" -> language: "en", gender: "male")
@@ -627,14 +691,36 @@
                             $('#translationResult').removeClass('d-none');
                             $('#downloadBtn').show();
                         } else {
-                            alert('Translation failed: ' + (response.message || 'Unknown error'));
+                            const errorMessage = response && response.message ? response.message : 'Unknown error occurred';
+                            alert('Translation failed: ' + errorMessage);
                             console.error('Translation error:', response);
                         }
                     },
-                    error: function(xhr) {
-                        const response = xhr.responseJSON || {};
-                        alert('Translation failed: ' + (response.message || 'Server error'));
-                        console.error('AJAX error:', xhr);
+                    error: function(xhr, status, error) {
+                        console.error('AJAX error details:', {
+                            status: xhr.status,
+                            statusText: xhr.statusText,
+                            responseText: xhr.responseText,
+                            error: error,
+                            ajaxStatus: status
+                        });
+                        
+                        let errorMessage = 'Server error occurred';
+                        
+                        if (xhr.status === 0) {
+                            errorMessage = 'Network error - please check your connection';
+                        } else if (xhr.status === 404) {
+                            errorMessage = 'Translation service not found';
+                        } else if (xhr.status === 500) {
+                            errorMessage = 'Server error - please try again';
+                        } else if (status === 'timeout') {
+                            errorMessage = 'Request timed out - please try again';
+                        } else {
+                            const response = xhr.responseJSON || {};
+                            errorMessage = response.message || `Error ${xhr.status}: ${xhr.statusText}`;
+                        }
+                        
+                        alert('Translation failed: ' + errorMessage);
                     },
                     complete: function() {
                         $('#loader').hide();
