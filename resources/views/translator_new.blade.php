@@ -1015,7 +1015,6 @@
                     }
                 }, isMobile ? 200 : 50);
             }
-            }
 
             // Language code mapping helper
             function getLanguageCode(lang) {
