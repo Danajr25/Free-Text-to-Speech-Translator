@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>SpeechTranslator - Free Text-to-Speech Translation</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -269,15 +269,93 @@
         @media (max-width: 768px) {
             .hero-title {
                 font-size: 2rem;
+                line-height: 1.1;
+            }
+            
+            .hero-subtitle {
+                font-size: 1rem;
+                padding: 0 1rem;
             }
             
             .translator-card {
-                margin: 1rem;
-                padding: 1.5rem;
+                margin: 0.5rem;
+                padding: 1rem;
+                border-radius: 0.75rem;
+            }
+            
+            .form-control, .form-select {
+                padding: 0.75rem;
+                font-size: 16px; /* Prevents zoom on iOS */
+            }
+            
+            .btn-primary {
+                padding: 0.875rem 1.5rem;
+                font-size: 1rem;
+                width: 100%;
             }
             
             .audio-controls {
                 justify-content: center;
+                flex-direction: column;
+                gap: 0.75rem;
+            }
+            
+            .audio-controls button {
+                width: 100%;
+                max-width: 280px;
+                padding: 0.875rem 1.5rem !important;
+                font-size: 1rem !important;
+                touch-action: manipulation; /* Improves touch response */
+                -webkit-tap-highlight-color: transparent; /* Remove tap highlight */
+            }
+            
+            .translation-result {
+                padding: 1.5rem;
+                margin-top: 1.5rem;
+            }
+            
+            .translation-text {
+                font-size: 1rem;
+                line-height: 1.6;
+            }
+            
+            .tab-buttons {
+                flex-direction: column;
+                gap: 0.5rem;
+                align-items: center;
+            }
+            
+            .tab-btn {
+                width: 100%;
+                max-width: 280px;
+                text-align: center;
+            }
+            
+            .hero-section {
+                padding: 2rem 0;
+            }
+            
+            .translator-section {
+                padding: 2rem 0;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .hero-title {
+                font-size: 1.75rem;
+            }
+            
+            .translator-card {
+                margin: 0.25rem;
+                padding: 0.75rem;
+            }
+            
+            .form-control, .form-select {
+                padding: 0.625rem;
+            }
+            
+            .row .col-md-6 {
+                margin-bottom: 1rem;
             }
         }
     </style>
@@ -448,6 +526,7 @@
             
             // Check if speech synthesis is supported
             const isSpeechSynthesisSupported = 'speechSynthesis' in window;
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             
             // Translation state
             let currentUtterance = null;
@@ -455,6 +534,7 @@
             let currentLanguage = '';
             let currentVoiceSettings = {};
             let speechState = 'idle'; // 'idle', 'playing', 'paused'
+            let voicesLoaded = false;
             
             // Audio recording state
             let audioBlob = null;
@@ -464,6 +544,34 @@
             
             if (!isSpeechSynthesisSupported) {
                 alert("Your browser doesn't support speech synthesis. Please try a different browser like Chrome, Edge, or Safari.");
+            }
+            
+            // Wait for voices to load (important for mobile)
+            function waitForVoices() {
+                return new Promise((resolve) => {
+                    if (voicesLoaded) {
+                        resolve();
+                        return;
+                    }
+                    
+                    const voices = speechSynthesis.getVoices();
+                    if (voices.length > 0) {
+                        voicesLoaded = true;
+                        resolve();
+                        return;
+                    }
+                    
+                    speechSynthesis.onvoiceschanged = () => {
+                        voicesLoaded = true;
+                        resolve();
+                    };
+                    
+                    // Fallback timeout
+                    setTimeout(() => {
+                        voicesLoaded = true;
+                        resolve();
+                    }, 3000);
+                });
             }
 
             // Update speed value display
@@ -535,33 +643,64 @@
             });
 
             // Play/Pause button click handler
-            $('#playPauseBtn').click(function() {
+            $('#playPauseBtn').click(async function() {
+                const $btn = $(this);
+                
                 console.log('Button clicked. Speech state:', {
                     manualState: speechState,
                     speaking: speechSynthesis.speaking,
                     paused: speechSynthesis.paused,
-                    pending: speechSynthesis.pending
+                    pending: speechSynthesis.pending,
+                    isMobile: isMobile
                 });
                 
                 if (currentTranslation && currentLanguage) {
-                    if (speechState === 'playing') {
-                        // Currently playing, so pause
-                        console.log('Pausing speech');
-                        speechSynthesis.pause();
-                        speechState = 'paused';
-                        $(this).html('<i class="fas fa-play me-2"></i>Resume Audio');
-                    } else if (speechState === 'paused') {
-                        // Currently paused, so resume
-                        console.log('Resuming speech');
-                        speechSynthesis.resume();
-                        speechState = 'playing';
-                        $(this).html('<i class="fas fa-pause me-2"></i>Pause Audio');
-                    } else {
-                        // Not playing or finished, start new playback
-                        console.log('Starting new speech');
-                        speechState = 'playing';
-                        playTranslation(currentTranslation, currentLanguage, currentVoiceSettings);
+                    // Prevent double-clicking
+                    if ($btn.prop('disabled')) {
+                        return;
                     }
+                    
+                    $btn.prop('disabled', true);
+                    
+                    try {
+                        if (speechState === 'playing' && speechSynthesis.speaking) {
+                            // Currently playing, so pause
+                            console.log('Pausing speech');
+                            if (isMobile) {
+                                // On mobile, cancel and restart is more reliable than pause/resume
+                                speechSynthesis.cancel();
+                                speechState = 'paused';
+                                $btn.html('<i class="fas fa-play me-2"></i>Resume Audio');
+                            } else {
+                                speechSynthesis.pause();
+                                speechState = 'paused';
+                                $btn.html('<i class="fas fa-play me-2"></i>Resume Audio');
+                            }
+                        } else if (speechState === 'paused') {
+                            // Currently paused, restart playback (more reliable on mobile)
+                            console.log('Resuming/Restarting speech');
+                            speechSynthesis.cancel(); // Clear any previous utterance
+                            speechState = 'playing';
+                            await waitForVoices();
+                            playTranslation(currentTranslation, currentLanguage, currentVoiceSettings);
+                        } else {
+                            // Not playing or finished, start new playback
+                            console.log('Starting new speech');
+                            speechSynthesis.cancel(); // Clear any previous utterance
+                            speechState = 'playing';
+                            await waitForVoices();
+                            playTranslation(currentTranslation, currentLanguage, currentVoiceSettings);
+                        }
+                    } catch (error) {
+                        console.error('Speech error:', error);
+                        speechState = 'idle';
+                        $btn.html('<i class="fas fa-play me-2"></i>Play Audio');
+                    }
+                    
+                    // Re-enable button after a short delay
+                    setTimeout(() => {
+                        $btn.prop('disabled', false);
+                    }, isMobile ? 1000 : 500);
                 }
             });
 
@@ -644,12 +783,14 @@
 
                 // Cancel any ongoing speech
                 speechSynthesis.cancel();
-                speechState = 'idle';
                 
-                // Create new utterance
-                currentUtterance = new SpeechSynthesisUtterance(text);
-                currentUtterance.rate = voiceSettings.speed || 1.0;
-                currentUtterance.pitch = 1.0;
+                // Wait a bit for cancel to complete (important on mobile)
+                setTimeout(() => {
+                    // Create new utterance
+                    currentUtterance = new SpeechSynthesisUtterance(text);
+                    currentUtterance.rate = voiceSettings.speed || 1.0;
+                    currentUtterance.pitch = 1.0;
+                    currentUtterance.volume = 1.0;
                 
                 // Try to find a voice that matches the language and gender preference
                 const voices = speechSynthesis.getVoices();
@@ -739,41 +880,55 @@
                     console.log("No voices available for target language:", language);
                 }
 
-                // Set up event listeners
-                currentUtterance.onstart = function() {
-                    console.log('Speech started');
-                    speechState = 'playing';
-                    $('#playPauseBtn').html('<i class="fas fa-pause me-2"></i>Pause Audio');
-                };
+                    // Set up event listeners
+                    currentUtterance.onstart = function() {
+                        console.log('Speech started');
+                        speechState = 'playing';
+                        $('#playPauseBtn').html('<i class="fas fa-pause me-2"></i>Pause Audio').prop('disabled', false);
+                    };
 
-                currentUtterance.onend = function() {
-                    console.log('Speech ended');
-                    speechState = 'idle';
-                    $('#playPauseBtn').html('<i class="fas fa-play me-2"></i>Play Audio');
-                    currentUtterance = null;
-                };
+                    currentUtterance.onend = function() {
+                        console.log('Speech ended');
+                        speechState = 'idle';
+                        $('#playPauseBtn').html('<i class="fas fa-play me-2"></i>Play Audio').prop('disabled', false);
+                        currentUtterance = null;
+                    };
 
-                currentUtterance.onerror = function(event) {
-                    console.log('Speech error:', event);
-                    speechState = 'idle';
-                    $('#playPauseBtn').html('<i class="fas fa-play me-2"></i>Play Audio');
-                    currentUtterance = null;
-                };
+                    currentUtterance.onerror = function(event) {
+                        console.log('Speech error:', event);
+                        speechState = 'idle';
+                        $('#playPauseBtn').html('<i class="fas fa-play me-2"></i>Play Audio').prop('disabled', false);
+                        currentUtterance = null;
+                    };
 
-                currentUtterance.onpause = function() {
-                    console.log('Speech paused event fired');
-                    speechState = 'paused';
-                    $('#playPauseBtn').html('<i class="fas fa-play me-2"></i>Resume Audio');
-                };
+                    currentUtterance.onpause = function() {
+                        console.log('Speech paused event fired');
+                        if (!isMobile) { // Pause/resume works better on desktop
+                            speechState = 'paused';
+                            $('#playPauseBtn').html('<i class="fas fa-play me-2"></i>Resume Audio').prop('disabled', false);
+                        }
+                    };
 
-                currentUtterance.onresume = function() {
-                    console.log('Speech resumed event fired');
-                    speechState = 'playing';
-                    $('#playPauseBtn').html('<i class="fas fa-pause me-2"></i>Pause Audio');
-                };
+                    currentUtterance.onresume = function() {
+                        console.log('Speech resumed event fired');
+                        speechState = 'playing';
+                        $('#playPauseBtn').html('<i class="fas fa-pause me-2"></i>Pause Audio').prop('disabled', false);
+                    };
 
-                // Play the speech
-                speechSynthesis.speak(currentUtterance);
+                    // Play the speech
+                    speechSynthesis.speak(currentUtterance);
+                    
+                    // Mobile fallback: check if speech actually started
+                    if (isMobile) {
+                        setTimeout(() => {
+                            if (!speechSynthesis.speaking && speechState === 'playing') {
+                                console.log('Speech failed to start on mobile, retrying...');
+                                speechSynthesis.speak(currentUtterance);
+                            }
+                        }, 500);
+                    }
+                }, isMobile ? 200 : 50);
+            }
             }
 
             // Language code mapping helper
@@ -797,8 +952,20 @@
             function initVoices() {
                 if (speechSynthesis.onvoiceschanged !== undefined) {
                     speechSynthesis.onvoiceschanged = function() {
-                        console.log("Voices loaded:", speechSynthesis.getVoices().length);
+                        const voices = speechSynthesis.getVoices();
+                        console.log("Voices loaded:", voices.length);
+                        voicesLoaded = true;
+                        
+                        // Log available voices for debugging
+                        if (voices.length > 0) {
+                            console.log("Available voices:", voices.slice(0, 5).map(v => `${v.name} (${v.lang})`));
+                        }
                     };
+                }
+                
+                // Trigger voice loading on mobile
+                if (isMobile) {
+                    waitForVoices();
                 }
             }
 
