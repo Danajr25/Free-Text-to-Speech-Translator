@@ -456,6 +456,12 @@
             let currentVoiceSettings = {};
             let speechState = 'idle'; // 'idle', 'playing', 'paused'
             
+            // Audio recording state
+            let audioBlob = null;
+            let audioUrl = null;
+            let mediaRecorder = null;
+            let audioChunks = [];
+            
             if (!isSpeechSynthesisSupported) {
                 alert("Your browser doesn't support speech synthesis. Please try a different browser like Chrome, Edge, or Safari.");
             }
@@ -621,59 +627,24 @@
                 }
             });
 
-            // Download button click handler - Generate MP3 audio
+            // Download button click handler - Download captured audio
             $('#downloadBtn').click(function() {
-                if (currentTranslation && currentLanguage && currentVoiceSettings) {
-                    // Create a new utterance for recording
-                    const utterance = new SpeechSynthesisUtterance(currentTranslation);
-                    utterance.rate = currentVoiceSettings.speed || 1.0;
-                    utterance.pitch = 1.0;
-                    
-                    // Find and set the voice
-                    const voices = speechSynthesis.getVoices();
-                    const targetVoices = voices.filter(voice => 
-                        voice.lang.startsWith(currentLanguage) || voice.lang.startsWith(getLanguageCode(currentLanguage))
-                    );
-                    
-                    if (targetVoices.length > 0) {
-                        let selectedVoice = targetVoices[0];
-                        
-                        if (currentVoiceSettings.gender && targetVoices.length > 1) {
-                            const genderMatch = targetVoices.find(voice => {
-                                const voiceName = voice.name.toLowerCase();
-                                if (currentVoiceSettings.gender === 'male') {
-                                    return voiceName.includes('male') || voiceName.includes('man') || 
-                                           voiceName.includes('david') || voiceName.includes('mark') || 
-                                           voiceName.includes('alex') || voiceName.includes('tom');
-                                } else {
-                                    return voiceName.includes('female') || voiceName.includes('woman') || 
-                                           voiceName.includes('sara') || voiceName.includes('anna') || 
-                                           voiceName.includes('zira') || voiceName.includes('hazel');
-                                }
-                            });
-                            if (genderMatch) selectedVoice = genderMatch;
-                        }
-                        
-                        utterance.voice = selectedVoice;
+                if (audioBlob && audioUrl) {
+                    // Download the captured audio
+                    const link = document.createElement('a');
+                    link.href = audioUrl;
+                    link.download = `translation-${Date.now()}.wav`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    console.log('Audio download initiated');
+                } else {
+                    // If no audio captured, generate and record it
+                    if (currentTranslation && currentLanguage && currentVoiceSettings) {
+                        generateAndRecordAudio();
+                    } else {
+                        alert('No audio available to download. Please generate translation first.');
                     }
-                    
-                    // Note: Browser-based MP3 generation is complex and requires additional libraries
-                    // For now, we'll show an alert explaining this limitation
-                    alert('MP3 download feature requires additional audio processing libraries. ' +
-                          'For now, you can use the play button to listen to the audio. ' +
-                          'MP3 export functionality would require a server-side solution.');
-                    
-                    // Alternative: Download as text with audio instructions
-                    const content = `Translation: ${currentTranslation}\n\nLanguage: ${currentLanguage}\nSpeed: ${currentVoiceSettings.speed || 1.0}\nGender: ${currentVoiceSettings.gender || 'default'}\n\nTo hear this translation, use the Play Audio button in the web application.`;
-                    const blob = new Blob([content], { type: 'text/plain' });
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'translation_with_audio_info.txt';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
                 }
             });
 
@@ -686,6 +657,9 @@
                 // Cancel any ongoing speech
                 speechSynthesis.cancel();
                 speechState = 'idle';
+                
+                // Start audio recording if supported
+                startAudioRecording();
                 
                 // Create new utterance
                 currentUtterance = new SpeechSynthesisUtterance(text);
@@ -792,6 +766,9 @@
                     speechState = 'idle';
                     $('#playPauseBtn').html('<i class="fas fa-play me-2"></i>Play Audio');
                     currentUtterance = null;
+                    
+                    // Stop audio recording
+                    stopAudioRecording();
                 };
 
                 currentUtterance.onerror = function(event) {
@@ -840,6 +817,139 @@
                     speechSynthesis.onvoiceschanged = function() {
                         console.log("Voices loaded:", speechSynthesis.getVoices().length);
                     };
+                }
+            }
+
+            // Audio recording functions
+            function startAudioRecording() {
+                if (!('MediaRecorder' in window)) {
+                    console.log('MediaRecorder not supported');
+                    return;
+                }
+                
+                // Reset previous recording
+                if (audioUrl) {
+                    URL.revokeObjectURL(audioUrl);
+                    audioUrl = null;
+                }
+                audioBlob = null;
+                audioChunks = [];
+                
+                // Get user media for recording
+                navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        sampleRate: 44100
+                    } 
+                })
+                .then(stream => {
+                    mediaRecorder = new MediaRecorder(stream, {
+                        mimeType: 'audio/webm;codecs=opus'
+                    });
+                    
+                    mediaRecorder.ondataavailable = function(event) {
+                        if (event.data.size > 0) {
+                            audioChunks.push(event.data);
+                        }
+                    };
+                    
+                    mediaRecorder.onstop = function() {
+                        audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        audioUrl = URL.createObjectURL(audioBlob);
+                        
+                        // Enable download button
+                        $('#downloadBtn').removeClass('d-none').prop('disabled', false);
+                        console.log('Audio recording completed, download ready');
+                        
+                        // Stop all tracks to release microphone
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+                    
+                    mediaRecorder.start();
+                    console.log('Audio recording started');
+                })
+                .catch(err => {
+                    console.log('Could not start audio recording:', err);
+                    // Don't show error to user, just continue without recording
+                });
+            }
+            
+            function stopAudioRecording() {
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                    console.log('Audio recording stopped');
+                }
+            }
+            
+            function generateAndRecordAudio() {
+                if (currentTranslation && currentLanguage && currentVoiceSettings) {
+                    console.log('Generating audio for download...');
+                    
+                    // Show loading state
+                    $('#downloadBtn').html('<i class="fas fa-spinner fa-spin me-2"></i>Generating...');
+                    
+                    // Start recording and play audio
+                    startAudioRecording();
+                    
+                    // Create utterance
+                    const utterance = new SpeechSynthesisUtterance(currentTranslation);
+                    utterance.rate = currentVoiceSettings.speed || 1.0;
+                    utterance.pitch = 1.0;
+                    
+                    // Find and set the voice
+                    const voices = speechSynthesis.getVoices();
+                    const targetVoices = voices.filter(voice => 
+                        voice.lang.startsWith(currentLanguage) || voice.lang.startsWith(getLanguageCode(currentLanguage))
+                    );
+                    
+                    if (targetVoices.length > 0) {
+                        let selectedVoice = targetVoices[0];
+                        
+                        if (currentVoiceSettings.gender && targetVoices.length > 1) {
+                            const genderMatch = targetVoices.find(voice => {
+                                const voiceName = voice.name.toLowerCase();
+                                if (currentVoiceSettings.gender === 'male') {
+                                    return voiceName.includes('male') || voiceName.includes('man') || 
+                                           voiceName.includes('david') || voiceName.includes('mark') || 
+                                           voiceName.includes('alex') || voiceName.includes('tom');
+                                } else {
+                                    return voiceName.includes('female') || voiceName.includes('woman') || 
+                                           voiceName.includes('sara') || voiceName.includes('anna') || 
+                                           voiceName.includes('zira') || voiceName.includes('hazel');
+                                }
+                            });
+                            if (genderMatch) selectedVoice = genderMatch;
+                        }
+                        
+                        utterance.voice = selectedVoice;
+                    }
+                    
+                    utterance.onend = function() {
+                        stopAudioRecording();
+                        $('#downloadBtn').html('<i class="fas fa-download me-2"></i>Download');
+                        
+                        // Auto-download after generation
+                        setTimeout(() => {
+                            if (audioUrl) {
+                                const link = document.createElement('a');
+                                link.href = audioUrl;
+                                link.download = `translation-${Date.now()}.webm`;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                            }
+                        }, 500);
+                    };
+                    
+                    utterance.onerror = function() {
+                        stopAudioRecording();
+                        $('#downloadBtn').html('<i class="fas fa-download me-2"></i>Download');
+                        alert('Error generating audio. Please try again.');
+                    };
+                    
+                    // Speak the utterance
+                    speechSynthesis.speak(utterance);
                 }
             }
 

@@ -57,12 +57,10 @@ RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 # Create start script that includes migrations
 RUN echo '#!/bin/bash' > /start.sh && \
     echo 'echo "Starting Laravel application..."' >> /start.sh && \
-    echo 'echo "Clearing Laravel caches..."' >> /start.sh && \
-    echo 'php artisan config:clear || echo "Config clear failed"' >> /start.sh && \
-    echo 'php artisan route:clear || echo "Route clear failed"' >> /start.sh && \
-    echo 'php artisan view:clear || echo "View clear failed"' >> /start.sh && \
     echo 'echo "Running database migrations..."' >> /start.sh && \
     echo 'php artisan migrate --force --no-interaction || echo "Migration failed - continuing startup"' >> /start.sh && \
+    echo 'echo "Caching configuration..."' >> /start.sh && \
+    echo 'php artisan config:cache || echo "Config cache failed"' >> /start.sh && \
     echo 'echo "Starting PHP-FPM..."' >> /start.sh && \
     echo 'php-fpm -D' >> /start.sh && \
     echo 'echo "Starting Nginx..."' >> /start.sh && \

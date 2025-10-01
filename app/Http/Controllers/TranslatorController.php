@@ -62,31 +62,13 @@ class TranslatorController extends Controller
      */
     public function translate(Request $request)
     {
-        // Log the incoming request for debugging
-        \Log::info('Translation request received', [
-            'data' => $request->all(),
-            'headers' => $request->headers->all()
+        // Validate the request
+        $request->validate([
+            'text' => 'required|string',
+            'source_language' => 'required|string',
+            'target_language' => 'required|string', // Now in format "en-male" or "es-female"
+            'voice_speed' => 'nullable|numeric|between:0.5,2.0',
         ]);
-        
-        try {
-            // Validate the request
-            $request->validate([
-                'text' => 'required|string',
-                'source_language' => 'required|string',
-                'target_language' => 'required|string', // Now in format "en-male" or "es-female"
-                'voice_speed' => 'nullable|numeric|between:0.5,2.0',
-            ]);
-            
-            \Log::info('Validation passed');
-            
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            \Log::error('Validation failed', ['errors' => $e->errors()]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed: ' . implode(', ', collect($e->errors())->flatten()->toArray()),
-                'errors' => $e->errors()
-            ], 422);
-        }
         
         try {
             // Parse the target language format (e.g., "en-male" -> language: "en", gender: "male")
@@ -95,20 +77,11 @@ class TranslatorController extends Controller
             $targetLanguageCode = $parts[0];
             $voiceGender = isset($parts[1]) ? $parts[1] : 'female';
             
-            \Log::info('Parsed language data', [
-                'target_lang_value' => $targetLangValue,
-                'target_code' => $targetLanguageCode,
-                'voice_gender' => $voiceGender
-            ]);
-            
             // Check if source and target languages are the same
             if ($request->source_language === $targetLanguageCode) {
                 // No translation needed, just use the original text
                 $translatedText = $request->text;
-                \Log::info('Same language, no translation needed');
             } else {
-                \Log::info('Different languages, calling translation service');
-                
                 // Get the translation from the service
                 $result = $this->translationService->translate(
                     $request->text,
@@ -116,21 +89,16 @@ class TranslatorController extends Controller
                     $targetLanguageCode
                 );
                 
-                \Log::info('Translation service result', ['result' => $result]);
-                
                 if (!$result['success']) {
-                    \Log::error('Translation service failed', ['result' => $result]);
                     return response()->json([
                         'success' => false,
-                        'message' => 'Translation service error: ' . ($result['message'] ?? 'Unknown error'),
-                        'debug' => $result
+                        'message' => $result['message'],
+                        'debug' => $result['debug'] ?? null
                     ], 500);
                 }
                 
                 $translatedText = $result['translated_text'];
             }
-            
-            \Log::info('About to save to database');
             
             // Store in history
             $history = TranslationHistory::create([
@@ -144,8 +112,6 @@ class TranslatorController extends Controller
                 ]),
             ]);
             
-            \Log::info('Successfully saved to database', ['history_id' => $history->id]);
-            
             // Return the translated text with voice settings
             return response()->json([
                 'success' => true,
@@ -157,21 +123,9 @@ class TranslatorController extends Controller
                 'voice_speed' => $request->voice_speed ?? 1.0
             ]);
         } catch (\Exception $e) {
-            \Log::error('Translation controller exception', [
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            
             return response()->json([
                 'success' => false,
-                'message' => 'Translation error: ' . $e->getMessage(),
-                'debug' => [
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                    'message' => $e->getMessage()
-                ]
+                'message' => 'An error occurred: ' . $e->getMessage()
             ], 500);
         }
     }
