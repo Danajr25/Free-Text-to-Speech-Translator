@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Translation History - SpeechTranslator</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -35,6 +35,14 @@
             background: var(--bg-gradient);
             min-height: 100vh;
             color: var(--text-dark);
+        }
+
+        .header {
+            padding: 1.5rem 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
         }
 
         .navbar {
@@ -73,6 +81,53 @@
         .nav-link.active {
             color: var(--primary-color) !important;
             background: rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+            margin: 0;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-dark);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary-color);
+        }
+
+        .dropdown-toggle::after {
+            display: none;
+        }
+
+        .dropdown-menu {
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            box-shadow: var(--shadow-lg);
+            padding: 0.5rem 0;
+            min-width: 160px;
+        }
+
+        .dropdown-item {
+            padding: 0.75rem 1rem;
+            color: var(--text-dark);
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .dropdown-item:hover {
+            background-color: var(--light-gray);
+            color: var(--primary-color);
+        }
+
+        .dropdown-item i {
+            color: var(--primary-color);
         }
     
         .translator-card {
@@ -168,27 +223,35 @@
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg">
+    <div class="header">
         <div class="container">
-            <a class="navbar-brand" href="{{ route('translator.index') }}">
-                <i class="fas fa-language"></i>
-                SpeechTranslator
-            </a>
-            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ route('translator.index') }}">Translator</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active" href="{{ route('translator.history') }}">History</a>
-                    </li>
+            <div class="d-flex justify-content-between align-items-center">
+                <a href="{{ route('translator.index') }}" class="navbar-brand">
+                    <i class="fas fa-language"></i>
+                    SpeechTranslator
+                </a>
+                <!-- Desktop Navigation -->
+                <ul class="nav-links d-none d-md-flex">
+                    <li><a href="{{ route('translator.index') }}">Translator</a></li>
+                    <li><a href="{{ route('translator.history') }}" style="color: var(--primary-color);">History</a></li>
                 </ul>
+                <!-- Mobile Navigation Dropdown -->
+                <div class="dropdown d-md-none">
+                    <button class="btn btn-link dropdown-toggle p-0" type="button" id="mobileMenuDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="color: var(--primary-color); font-size: 1.5rem; border: none; background: none;">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="mobileMenuDropdown">
+                        <li><a class="dropdown-item" href="{{ route('translator.index') }}">
+                            <i class="fas fa-language me-2"></i>Translator
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ route('translator.history') }}">
+                            <i class="fas fa-history me-2"></i>History
+                        </a></li>
+                    </ul>
+                </div>
             </div>
         </div>
-    </nav>
+    </div>
 
     <div class="container py-5">
         <div class="row justify-content-center">
